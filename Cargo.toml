@@ -11,5 +11,5 @@ azalea = { git="https://github.com/mat-1/azalea" }
 dotenv = "0.15.0"
 env_logger = "0.9.1"
 parking_lot = "0.12.1"
-serenity = {version="0.11.5"}
+serenity = { version = "0.11.5", default-features = false, features = ["builder", "cache", "chrono", "client", "gateway", "model", "http", "utils", "rustls_backend"] }
 tokio = { version = "1.21.2", features = ["full"] }

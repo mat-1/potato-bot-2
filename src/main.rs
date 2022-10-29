@@ -1,7 +1,7 @@
 #![feature(async_closure)]
 
 use parking_lot::Mutex;
-use serenity::futures::future::{self,BoxFuture};
+use serenity::futures::future::{self, BoxFuture};
 use serenity::model::channel::Message;
 use serenity::model::id::ChannelId;
 use serenity::{async_trait, prelude::*};
@@ -47,6 +47,7 @@ impl EventHandler for Handler {
             return;
         };
         let discord_channel_id: u64 = env::var("DISCORD_CHANNEL_ID").unwrap().parse().unwrap();
+        println!("discord_channel_id={}", discord_channel_id);
         if msg.channel_id != discord_channel_id {
             return;
         };
@@ -92,8 +93,8 @@ struct State {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    env_logger::init();
     dotenv::dotenv().expect("Failed to load .env file");
+    env_logger::init();
 
     let account =
         azalea::Account::microsoft(&env::var("EMAIL").expect("Expected EMAIL in env")).await?;
@@ -101,14 +102,12 @@ async fn main() -> anyhow::Result<()> {
 
     let discord_channel_id: u64 = env::var("DISCORD_CHANNEL_ID").unwrap().parse().unwrap();
 
-    let intents = GatewayIntents::GUILD_MESSAGES
-        | GatewayIntents::DIRECT_MESSAGES
-        | GatewayIntents::MESSAGE_CONTENT;
+    let intents = GatewayIntents::non_privileged() | GatewayIntents::MESSAGE_CONTENT;
 
     // Create a new instance of the Client, logging in as a bot. This will
     // automatically prepend your bot token with "Bot ", which is a requirement
     // by Discord for bot users.
-    let discord_client = Client::builder(&token, intents)
+    let mut discord_client = Client::builder(&token, intents)
         .event_handler(Handler)
         .await
         .expect("Err creating client");
@@ -116,8 +115,11 @@ async fn main() -> anyhow::Result<()> {
     let messages_queued_to_minecraft = Arc::new(Mutex::new(Vec::default()));
     let messages_queued_to_discord = Arc::new(Mutex::new(Vec::default()));
 
+    let discord_client_data = discord_client.data.clone();
+    let discord_client_cache_and_http = discord_client.cache_and_http.clone();
+
     {
-        let mut data = discord_client.data.write().await;
+        let mut data = discord_client_data.write().await;
 
         data.insert::<MessagesQueuedToMinecraft>(messages_queued_to_minecraft.clone());
         data.insert::<MessagesQueuedToDiscord>(messages_queued_to_discord.clone());
@@ -149,7 +151,7 @@ async fn main() -> anyhow::Result<()> {
                     // adding this message would make it longer than the limit, so send now
                     if (message.len() + sending_message.len()) >= 2000 {
                         if let Err(e) = channel_id
-                            .say(&discord_client.cache_and_http.http, &sending_message)
+                            .say(&discord_client_cache_and_http.http, &sending_message)
                             .await
                         {
                             eprintln!("Couldn't send message to Discord: {:?}", e);
@@ -159,25 +161,39 @@ async fn main() -> anyhow::Result<()> {
                     sending_message.push_str(&message);
                     sending_message.push('\n');
                 }
-                // channel_id.say(&discord_client.cache_and_http.http, );
+                if let Err(e) = channel_id
+                    .say(&discord_client_cache_and_http.http, &sending_message)
+                    .await
+                {
+                    eprintln!("Couldn't send message to Discord: {:?}", e);
+                };
             }
         }
     });
 
-    azalea::start(azalea::Options {
-        account,
-        address: "localhost",
-        state: State {
-            messages_queued_to_minecraft,
-            messages_queued_to_discord,
-        },
-        plugins: vec![],
-        handle: mc_handle,
-    })
-    .await
-    .unwrap();
+    tokio::spawn(async move {
+        if let Err(why) = discord_client.start().await {
+            println!("Discord client error: {:?}", why);
+        };
+    });
 
-    Ok(())
+    loop {
+        azalea::start(azalea::Options {
+            account: account.clone(),
+            address: &env::var("SERVER_IP").expect("Expected SERVER_IP in env")[..],
+            state: State {
+                messages_queued_to_minecraft: messages_queued_to_minecraft.clone(),
+                messages_queued_to_discord: messages_queued_to_discord.clone(),
+            },
+            plugins: vec![],
+            handle: mc_handle,
+        })
+        .await
+        .unwrap();
+        sleep(Duration::from_secs(4)).await;
+    }
+
+    // Ok(())
 }
 
 async fn mc_handle(
@@ -187,7 +203,6 @@ async fn mc_handle(
 ) -> anyhow::Result<()> {
     match event {
         azalea::Event::Login => {
-            bot.chat("Hello world").await?;
         }
         azalea::Event::Tick => {
             let messages_queued_to_minecraft = {
@@ -209,10 +224,12 @@ async fn mc_handle(
                 }
                 future::join_all(futures).await;
             }
-            bot.walk(azalea::MoveDirection::ForwardLeft);
+            // bot.walk(azalea::MoveDirection::ForwardLeft);
         }
         azalea::Event::Chat(m) => {
+            println!("Got Minecraft chat packet: {}", m.message().to_ansi(None));
             let message_string = m.message().to_string();
+            if message_string.starts_with("<matdoesdev> ") { return Ok(()); }
             let mut messages_queued_to_discord = state.messages_queued_to_discord.lock();
             messages_queued_to_discord.push(message_string);
         }
