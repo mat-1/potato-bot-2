@@ -47,11 +47,11 @@ impl EventHandler for Handler {
             return;
         };
         let discord_channel_id: u64 = env::var("DISCORD_CHANNEL_ID").unwrap().parse().unwrap();
-        println!("discord_channel_id={}", discord_channel_id);
         if msg.channel_id != discord_channel_id {
             return;
         };
-
+        
+        println!("got discord message");
         let queued_to_minecraft = {
             let data_read = ctx.data.read().await;
             data_read
@@ -185,7 +185,7 @@ async fn main() -> anyhow::Result<()> {
     });
 
     loop {
-        azalea::start(azalea::Options {
+        let error = azalea::start(azalea::Options {
             account: account.clone(),
             address: &env::var("SERVER_IP").expect("Expected SERVER_IP in env")[..],
             state: State {
@@ -195,8 +195,8 @@ async fn main() -> anyhow::Result<()> {
             plugins: vec![],
             handle: mc_handle,
         })
-        .await
-        .unwrap();
+        .await;
+        eprintln!("{:?}", error);
         sleep(Duration::from_secs(4)).await;
     }
 
