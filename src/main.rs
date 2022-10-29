@@ -62,7 +62,7 @@ impl EventHandler for Handler {
 
         let message_content = msg.content.clone();
         let message_content = format!(
-            "{}#{}: {}",
+            "{}#{:0>4}: {}",
             msg.author.name, msg.author.discriminator, message_content
         );
 
