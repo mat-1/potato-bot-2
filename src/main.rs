@@ -70,6 +70,7 @@ impl EventHandler for Handler {
             if let Err(e) = msg.react(&ctx, '🚫').await {
                 eprintln!("Couldn't react with thumbsup/thumbsdown: {}", e);
             }
+            return;
         }
 
         let callback = async move |success: bool| {
