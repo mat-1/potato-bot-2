@@ -236,6 +236,14 @@ async fn mc_handle(
             if message_string.starts_with("<matdoesdev> ") {
                 return Ok(());
             }
+            let content_part = message_string
+                .splitn(2, "> ")
+                .nth(1)
+                .unwrap_or(&message_string);
+            if content_part.starts_with("/skill") {
+                // spam
+                return Ok(());
+            }
             let mut messages_queued_to_discord = state.messages_queued_to_discord.lock();
             messages_queued_to_discord.push(message_string);
         }
