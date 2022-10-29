@@ -4,7 +4,7 @@ use parking_lot::Mutex;
 use serenity::futures::future::{self, BoxFuture};
 use serenity::model::channel::Message;
 use serenity::model::id::ChannelId;
-use serenity::{async_trait, prelude::*};
+use serenity::{async_trait, prelude::*, CacheAndHttp};
 use std::env;
 use std::future::Future;
 use std::sync::Arc;
@@ -150,9 +150,12 @@ async fn main() -> anyhow::Result<()> {
                     }
                     // adding this message would make it longer than the limit, so send now
                     if (message.len() + sending_message.len()) >= 2000 {
-                        if let Err(e) = channel_id
-                            .say(&discord_client_cache_and_http.http, &sending_message)
-                            .await
+                        if let Err(e) = send_message(
+                            &channel_id,
+                            &discord_client_cache_and_http.http,
+                            &sending_message,
+                        )
+                        .await
                         {
                             eprintln!("Couldn't send message to Discord: {:?}", e);
                         };
@@ -161,9 +164,12 @@ async fn main() -> anyhow::Result<()> {
                     sending_message.push_str(&message);
                     sending_message.push('\n');
                 }
-                if let Err(e) = channel_id
-                    .say(&discord_client_cache_and_http.http, &sending_message)
-                    .await
+                if let Err(e) = send_message(
+                    &channel_id,
+                    &discord_client_cache_and_http.http,
+                    &sending_message,
+                )
+                .await
                 {
                     eprintln!("Couldn't send message to Discord: {:?}", e);
                 };
@@ -202,12 +208,10 @@ async fn mc_handle(
     state: State,
 ) -> anyhow::Result<()> {
     match event {
-        azalea::Event::Login => {
-        }
+        azalea::Event::Login => {}
         azalea::Event::Tick => {
             let messages_queued_to_minecraft = {
-                let messages_queued_to_minecraft =
-                    &mut state.messages_queued_to_minecraft.lock();
+                let messages_queued_to_minecraft = &mut state.messages_queued_to_minecraft.lock();
                 messages_queued_to_minecraft
                     .drain(..)
                     .collect::<Vec<QueuedMessage>>()
@@ -229,7 +233,9 @@ async fn mc_handle(
         azalea::Event::Chat(m) => {
             println!("Got Minecraft chat packet: {}", m.message().to_ansi(None));
             let message_string = m.message().to_string();
-            if message_string.starts_with("<matdoesdev> ") { return Ok(()); }
+            if message_string.starts_with("<matdoesdev> ") {
+                return Ok(());
+            }
             let mut messages_queued_to_discord = state.messages_queued_to_discord.lock();
             messages_queued_to_discord.push(message_string);
         }
@@ -254,4 +260,17 @@ fn message_legal_to_minecraft(message: &str) -> bool {
     }
 
     return true;
+}
+
+async fn send_message(
+    channel_id: &ChannelId,
+    http: &Arc<serenity::http::Http>,
+    message: &str,
+) -> Result<(), serenity::Error> {
+    channel_id
+        .send_message(&http, |m| {
+            m.content(message).allowed_mentions(|am| am.empty_parse())
+        })
+        .await?;
+    Ok(())
 }
