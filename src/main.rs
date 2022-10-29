@@ -84,7 +84,7 @@ impl EventHandler for Handler {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 struct State {
     pub messages_queued_to_minecraft: Arc<Mutex<Vec<QueuedMessage>>>,
     pub messages_queued_to_discord: Arc<Mutex<Vec<String>>>,
@@ -167,10 +167,10 @@ async fn main() -> anyhow::Result<()> {
     azalea::start(azalea::Options {
         account,
         address: "localhost",
-        state: Arc::new(Mutex::new(State {
+        state: State {
             messages_queued_to_minecraft,
             messages_queued_to_discord,
-        })),
+        },
         plugins: vec![],
         handle: mc_handle,
     })
@@ -182,18 +182,17 @@ async fn main() -> anyhow::Result<()> {
 
 async fn mc_handle(
     mut bot: azalea::Client,
-    event: Arc<azalea::Event>,
-    state: Arc<Mutex<State>>,
+    event: azalea::Event,
+    state: State,
 ) -> anyhow::Result<()> {
-    match &*event {
+    match event {
         azalea::Event::Login => {
             bot.chat("Hello world").await?;
         }
         azalea::Event::Tick => {
             let messages_queued_to_minecraft = {
-                let state_lock = state.lock();
                 let messages_queued_to_minecraft =
-                    &mut state_lock.messages_queued_to_minecraft.lock();
+                    &mut state.messages_queued_to_minecraft.lock();
                 messages_queued_to_minecraft
                     .drain(..)
                     .collect::<Vec<QueuedMessage>>()
@@ -214,8 +213,7 @@ async fn mc_handle(
         }
         azalea::Event::Chat(m) => {
             let message_string = m.message().to_string();
-            let state_lock = state.lock();
-            let mut messages_queued_to_discord = state_lock.messages_queued_to_discord.lock();
+            let mut messages_queued_to_discord = state.messages_queued_to_discord.lock();
             messages_queued_to_discord.push(message_string);
         }
         _ => {}
