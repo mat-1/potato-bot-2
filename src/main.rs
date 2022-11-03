@@ -234,7 +234,7 @@ async fn mc_handle(
         azalea::Event::Chat(m) => {
             println!("Got Minecraft chat packet: {}", m.message().to_ansi(None));
             let message_string = m.message().to_string();
-            if message_string.starts_with("<matdoesdev> ") {
+            if message_string.starts_with("<matdoesdev> ") || message_string == "death.fell.accident.water" {
                 return Ok(());
             }
             let content_part = message_string
