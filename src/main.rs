@@ -192,7 +192,7 @@ async fn main() -> anyhow::Result<()> {
                 messages_queued_to_minecraft: messages_queued_to_minecraft.clone(),
                 messages_queued_to_discord: messages_queued_to_discord.clone(),
             },
-            plugins: vec![],
+            plugins: azalea::plugins![],
             handle: mc_handle,
         })
         .await;
