@@ -247,6 +247,7 @@ async fn mc_handle(
             }
             let mut messages_queued_to_discord = state.messages_queued_to_discord.lock();
             messages_queued_to_discord.push(message_string);
+            println!("messages_queued_to_discord: {:?}", messages_queued_to_discord);
         }
         _ => {}
     }
