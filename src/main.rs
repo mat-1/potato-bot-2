@@ -4,7 +4,7 @@ use parking_lot::Mutex;
 use serenity::futures::future::{self, BoxFuture};
 use serenity::model::channel::Message;
 use serenity::model::id::ChannelId;
-use serenity::{async_trait, prelude::*, CacheAndHttp};
+use serenity::{async_trait, prelude::*};
 use std::env;
 use std::future::Future;
 use std::sync::Arc;
@@ -50,7 +50,7 @@ impl EventHandler for Handler {
         if msg.channel_id != discord_channel_id {
             return;
         };
-        
+
         println!("got discord message");
         let queued_to_minecraft = {
             let data_read = ctx.data.read().await;
@@ -203,11 +203,7 @@ async fn main() -> anyhow::Result<()> {
     // Ok(())
 }
 
-async fn mc_handle(
-    mut bot: azalea::Client,
-    event: azalea::Event,
-    state: State,
-) -> anyhow::Result<()> {
+async fn mc_handle(bot: azalea::Client, event: azalea::Event, state: State) -> anyhow::Result<()> {
     match event {
         azalea::Event::Login => {}
         azalea::Event::Tick => {
@@ -232,9 +228,11 @@ async fn mc_handle(
             // bot.walk(azalea::MoveDirection::ForwardLeft);
         }
         azalea::Event::Chat(m) => {
-            println!("Got Minecraft chat packet: {}", m.message().to_ansi(None));
+            println!("Got Minecraft chat packet: {}", m.message().to_ansi());
             let message_string = m.message().to_string();
-            if message_string.starts_with("<matdoesdev> ") || message_string == "death.fell.accident.water" {
+            if message_string.starts_with("<matdoesdev> ")
+                || message_string == "death.fell.accident.water"
+            {
                 return Ok(());
             }
             let content_part = message_string
@@ -247,7 +245,10 @@ async fn mc_handle(
             }
             let mut messages_queued_to_discord = state.messages_queued_to_discord.lock();
             messages_queued_to_discord.push(message_string);
-            println!("messages_queued_to_discord: {:?}", messages_queued_to_discord);
+            println!(
+                "messages_queued_to_discord: {:?}",
+                messages_queued_to_discord
+            );
         }
         _ => {}
     }
