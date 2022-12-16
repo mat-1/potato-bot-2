@@ -235,7 +235,7 @@ async fn mc_handle(bot: azalea::Client, event: azalea::Event, state: State) -> a
                 let mut futures = vec![];
                 state
                     .chat_spam_tick_count
-                    .fetch_add(messages_queued_to_minecraft.len(), Ordering::SeqCst);
+                    .fetch_add(messages_queued_to_minecraft.len() * 20, Ordering::SeqCst);
                 for message in messages_queued_to_minecraft {
                     futures.push(async {
                         let message = message;
