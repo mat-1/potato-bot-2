@@ -1,5 +1,6 @@
 #![feature(async_closure)]
 
+use azalea_protocol::packets::game::serverbound_client_command_packet::ServerboundClientCommandPacket;
 use parking_lot::Mutex;
 use serenity::futures::future::{self, BoxFuture};
 use serenity::model::channel::Message;
@@ -211,6 +212,11 @@ async fn main() -> anyhow::Result<()> {
 async fn mc_handle(bot: azalea::Client, event: azalea::Event, state: State) -> anyhow::Result<()> {
     match event {
         azalea::Event::Login => {}
+        azalea::Event::Death(_) => {
+            bot.write_packet(ServerboundClientCommandPacket {
+                action: azalea_protocol::packets::game::serverbound_client_command_packet::Action::PerformRespawn,
+            }.get()).await?;
+        }
         azalea::Event::Tick => {
             // decrease the chat_spam_tick_count every tick (unless it's 0)
             let _ =
