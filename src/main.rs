@@ -7,6 +7,8 @@ use serenity::model::id::ChannelId;
 use serenity::{async_trait, prelude::*};
 use std::env;
 use std::future::Future;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
@@ -90,6 +92,8 @@ impl EventHandler for Handler {
 struct State {
     pub messages_queued_to_minecraft: Arc<Mutex<Vec<QueuedMessage>>>,
     pub messages_queued_to_discord: Arc<Mutex<Vec<String>>>,
+
+    pub chat_spam_tick_count: Arc<AtomicUsize>,
 }
 
 #[tokio::main]
@@ -191,6 +195,7 @@ async fn main() -> anyhow::Result<()> {
             state: State {
                 messages_queued_to_minecraft: messages_queued_to_minecraft.clone(),
                 messages_queued_to_discord: messages_queued_to_discord.clone(),
+                chat_spam_tick_count: Arc::new(AtomicUsize::new(0)),
             },
             plugins: azalea::plugins![],
             handle: mc_handle,
@@ -207,14 +212,30 @@ async fn mc_handle(bot: azalea::Client, event: azalea::Event, state: State) -> a
     match event {
         azalea::Event::Login => {}
         azalea::Event::Tick => {
+            // decrease the chat_spam_tick_count every tick (unless it's 0)
+            let _ =
+                state
+                    .chat_spam_tick_count
+                    .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |x| {
+                        if x > 0 {
+                            Some(x - 1)
+                        } else {
+                            None
+                        }
+                    });
+
             let messages_queued_to_minecraft = {
                 let messages_queued_to_minecraft = &mut state.messages_queued_to_minecraft.lock();
+                // the 100 is actually 200 in vanilla, but i chose 100 to make sure it doesn't go over
                 messages_queued_to_minecraft
-                    .drain(..)
+                    .drain(..((100 - state.chat_spam_tick_count.load(Ordering::SeqCst)) / 20))
                     .collect::<Vec<QueuedMessage>>()
             };
             if !messages_queued_to_minecraft.is_empty() {
                 let mut futures = vec![];
+                state
+                    .chat_spam_tick_count
+                    .fetch_add(messages_queued_to_minecraft.len(), Ordering::SeqCst);
                 for message in messages_queued_to_minecraft {
                     futures.push(async {
                         let message = message;
