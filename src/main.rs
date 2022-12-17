@@ -234,8 +234,9 @@ async fn mc_handle(bot: azalea::Client, event: azalea::Event, state: State) -> a
                 let messages_queued_to_minecraft = &mut state.messages_queued_to_minecraft.lock();
                 // the 100 is actually 200 in vanilla, but i chose 100 to make sure it doesn't go over
                 let max_drain = (100 - state.chat_spam_tick_count.load(Ordering::SeqCst)) / 20;
+                let len = messages_queued_to_minecraft.len();
                 messages_queued_to_minecraft
-                    .drain(..max_drain.min(messages_queued_to_minecraft.len()))
+                    .drain(..max_drain.min(len))
                     .collect::<Vec<QueuedMessage>>()
             };
             if !messages_queued_to_minecraft.is_empty() {
