@@ -64,12 +64,9 @@ impl EventHandler for Handler {
         };
 
         let message_content = msg.content.clone();
-        // escape markdown
         let message_content = format!(
             "{}#{:0>4}: {}",
-            msg.author.name,
-            msg.author.discriminator,
-            message_content.replace('*', "\\*").replace('_', "\\_")
+            msg.author.name, msg.author.discriminator, message_content
         );
 
         if !message_legal_to_minecraft(&message_content) {
@@ -312,7 +309,11 @@ async fn send_message(
 ) -> Result<(), serenity::Error> {
     channel_id
         .send_message(&http, |m| {
-            m.content(message).allowed_mentions(|am| am.empty_parse())
+            m.content(
+                // escape markdown
+                message.replace('*', "\\*").replace('_', "\\_"),
+            )
+            .allowed_mentions(|am| am.empty_parse())
         })
         .await?;
     Ok(())
