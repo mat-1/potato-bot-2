@@ -287,9 +287,6 @@ async fn mc_handle(bot: azalea::Client, event: azalea::Event, state: State) -> a
 
 /// Whether this message can be sent to Minecraft without the server kicking us.
 fn message_legal_to_minecraft(message: &str) -> bool {
-    if message.starts_with('/') {
-        return false;
-    }
     if message.len() > 256 {
         return false;
     }
