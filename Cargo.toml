@@ -7,8 +7,8 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.66"
-azalea = { git="https://github.com/mat-1/azalea" }
-azalea-protocol = { git="https://github.com/mat-1/azalea" }
+azalea = { git="https://github.com/mat-1/azalea", branch="1.19.2" }
+azalea-protocol = { git="https://github.com/mat-1/azalea", branch="1.19.2" }
 dotenv = "0.15.0"
 env_logger = "0.10.0"
 parking_lot = "0.12.1"
