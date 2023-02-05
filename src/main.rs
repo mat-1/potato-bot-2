@@ -6,12 +6,13 @@ use serenity::futures::future::{self, BoxFuture};
 use serenity::model::channel::Message;
 use serenity::model::id::ChannelId;
 use serenity::{async_trait, prelude::*};
+use std::collections::VecDeque;
 use std::env;
 use std::future::Future;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::time::sleep;
 
 struct Handler;
@@ -89,12 +90,24 @@ impl EventHandler for Handler {
     }
 }
 
+#[derive(Clone)]
+pub struct RecentMessage {
+    pub content: String,
+    /// The number of times the message was sent. 1 if the message was sent once.
+    pub sent_count: usize,
+    pub sent_at: Instant,
+}
+
 #[derive(Default, Clone)]
 struct State {
     pub messages_queued_to_minecraft: Arc<Mutex<Vec<QueuedMessage>>>,
     pub messages_queued_to_discord: Arc<Mutex<Vec<String>>>,
 
     pub chat_spam_tick_count: Arc<AtomicUsize>,
+
+    /// Last is most recent. Only stores last 5 messages sent, if a message is
+    /// re-sent then it gets removed and re-added with the new count.
+    pub recent_messages: Arc<Mutex<VecDeque<RecentMessage>>>,
 }
 
 #[tokio::main]
@@ -192,11 +205,14 @@ async fn main() -> anyhow::Result<()> {
     loop {
         let error = azalea::start(azalea::Options {
             account: account.clone(),
-            address: &env::var("SERVER_IP").expect("Expected SERVER_IP in env")[..],
+            address: env::var("SERVER_IP")
+                .expect("Expected SERVER_IP in env")
+                .as_str(),
             state: State {
                 messages_queued_to_minecraft: messages_queued_to_minecraft.clone(),
                 messages_queued_to_discord: messages_queued_to_discord.clone(),
                 chat_spam_tick_count: Arc::new(AtomicUsize::new(0)),
+                recent_messages: Arc::new(Mutex::new(VecDeque::new())),
             },
             plugins: azalea::plugins![],
             handle: mc_handle,
@@ -255,23 +271,52 @@ async fn mc_handle(bot: azalea::Client, event: azalea::Event, state: State) -> a
                 future::join_all(futures).await;
             }
             // bot.walk(azalea::MoveDirection::ForwardLeft);
+
+            pop_no_longer_recent_messages(&state).await;
         }
         azalea::Event::Chat(m) => {
             println!("Got Minecraft chat packet: {}", m.message().to_ansi());
             let message_string = m.message().to_string();
-            if message_string.starts_with("<matdoesdev> ")
-                || message_string == "death.fell.accident.water"
+            if message_string.starts_with("<matdoesdev> ") {
+                return Ok(());
+            }
+
             {
-                return Ok(());
+                let mut recent_messages = state.recent_messages.lock();
+                // check if the message is the same as one of the recent messages
+                for (i, recent_message) in recent_messages.clone().iter().enumerate() {
+                    if recent_message.content == message_string {
+                        // remove it and add it back with the sent_count increased
+                        recent_messages.remove(i);
+                        let new_sent_count = recent_message.sent_count + 1;
+                        recent_messages.push_back(RecentMessage {
+                            content: message_string.clone(),
+                            sent_count: new_sent_count,
+                            sent_at: Instant::now(),
+                        });
+
+                        // if it's a power of 2, send it to discord with [x<number>] at the end
+                        if new_sent_count.is_power_of_two() {
+                            let mut messages_queued_to_discord =
+                                state.messages_queued_to_discord.lock();
+                            messages_queued_to_discord
+                                .push(format!("{message_string} [x{new_sent_count}]"));
+                            println!(
+                                "(anti-spam) messages_queued_to_discord: {:?}",
+                                messages_queued_to_discord
+                            );
+                        }
+                        return Ok(());
+                    }
+                }
+                recent_messages.push_back(RecentMessage {
+                    content: message_string.clone(),
+                    sent_count: 1,
+                    sent_at: Instant::now(),
+                });
             }
-            let content_part = message_string
-                .splitn(2, "> ")
-                .nth(1)
-                .unwrap_or(&message_string);
-            if content_part.starts_with("/skill") {
-                // spam
-                return Ok(());
-            }
+            pop_no_longer_recent_messages(&state).await;
+
             let mut messages_queued_to_discord = state.messages_queued_to_discord.lock();
             messages_queued_to_discord.push(message_string);
             println!(
@@ -283,6 +328,45 @@ async fn mc_handle(bot: azalea::Client, event: azalea::Event, state: State) -> a
     }
 
     Ok(())
+}
+
+async fn pop_no_longer_recent_messages(state: &State) {
+    loop {
+        let front_message = {
+            let mut recent_messages = state.recent_messages.lock();
+            if recent_messages.len() <= 5 {
+                break;
+            }
+            recent_messages.pop_front().expect(
+                "we just checked to make sure there's stuff in recent_items so it shouldn't be empty",
+            )
+        };
+        handle_popped_recent_message(front_message, state).await;
+    }
+    // if the oldest message is older than 15 seconds, remove it
+    let front_message = {
+        let mut recent_messages = state.recent_messages.lock();
+        let Some(front_message) = recent_messages.front() else { return };
+        if front_message.sent_at.elapsed().as_secs() <= 15 {
+            return;
+        };
+        recent_messages.pop_front().expect(
+            "we just checked to make sure there's stuff in recent_items so it shouldn't be empty",
+        )
+    };
+    handle_popped_recent_message(front_message, state).await;
+}
+async fn handle_popped_recent_message(message: RecentMessage, state: &State) {
+    let sent_count = message.sent_count;
+    if sent_count <= 2 {
+        return;
+    }
+    let mut messages_queued_to_discord = state.messages_queued_to_discord.lock();
+    messages_queued_to_discord.push(format!("{} [x{sent_count}]", message.content));
+    println!(
+        "(anti-spam) messages_queued_to_discord: {:?}",
+        messages_queued_to_discord
+    );
 }
 
 /// Whether this message can be sent to Minecraft without the server kicking us.
