@@ -207,9 +207,7 @@ async fn main() -> anyhow::Result<()> {
             .add_plugin(AvoidKickPlugin)
             .add_plugin(DiscordPlugin {
                 token: token.clone(),
-                intents: Intents::GUILD_MESSAGES
-                    | Intents::MESSAGE_CONTENT
-                    | Intents::GUILD_MEMBERS,
+                intents: Intents::GUILD_MESSAGES | Intents::MESSAGE_CONTENT,
             })
             .add_plugin(DiscordBridgePlugin { channel_id })
             .set_handler(mc_handle)
