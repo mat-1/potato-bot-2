@@ -121,9 +121,9 @@ fn handle_from_discord_events(
             discord.tx.take().unwrap(),
         ))));
     }
-    future::block_on(future::poll_once(&mut discord.task.as_mut().unwrap()));
+    let mut discord_task = discord.task.as_mut().unwrap();
+    future::block_on(future::poll_once(&mut discord_task));
     while let Ok(event) = discord.rx.try_recv() {
-        println!("event from discord {event:?}");
         let event = match event {
             Ok(event) => event,
             Err(source) => {
@@ -140,7 +140,6 @@ fn handle_from_discord_events(
             recv::Event::MessageCreate(m) => message_create_events.send(*m),
             _ => {}
         }
-        println!("ok");
     }
 }
 

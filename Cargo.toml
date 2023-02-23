@@ -17,6 +17,7 @@ dotenv = "0.15.0"
 env_logger = "0.10.0"
 futures-lite = "1.12.0"
 log = "0.4.17"
+matrix-sdk = "0.6.2"
 parking_lot = "0.12.1"
 tokio = {version = "1.23.0", features = ["full"]}
 twilight-cache-inmemory = "0.15.0"
