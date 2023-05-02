@@ -169,7 +169,11 @@ pub fn to_minecraft<T: Clone + Sync + Send + 'static>(
             };
 
         // check if a message is legal and add it to the queue!
-        let message_content = format!("/me <{}> {}", event.username, event.content);
+        let message_content = if event.content == "/list" {
+            event.content
+        } else {
+            format!("/me <{}> {}", event.username, event.content)
+        };
 
         let chat_message_event =
             azalea_avoid_chat_kick::SendChatEvent::new(entity, &message_content);
