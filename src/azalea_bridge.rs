@@ -7,20 +7,19 @@ use std::{
 };
 
 use azalea::{
+    app::{App, Plugin},
     chat::ChatPacket,
     ecs::{
-        app::{App, Plugin},
+        entity::Entity,
         event::{EventReader, EventWriter},
+        query::With,
+        schedule::IntoSystemConfig,
         system::Query,
+        system::{ResMut, Resource},
     },
     entity::Local,
+    prelude::bevy_ecs,
     GameProfileComponent,
-};
-use bevy_ecs::{
-    entity::Entity,
-    query::With,
-    schedule::IntoSystemDescriptor,
-    system::{ResMut, Resource},
 };
 
 use crate::azalea_avoid_chat_kick;

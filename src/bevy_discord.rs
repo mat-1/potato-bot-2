@@ -3,13 +3,14 @@
 use std::{num::NonZeroU64, sync::Arc};
 
 use async_compat::Compat;
-use bevy_app::{App, Plugin};
-use bevy_ecs::{
+use azalea::app::{App, Plugin};
+use azalea::ecs::{
     component::Component,
     entity::Entity,
     event::{EventReader, EventWriter},
     system::{Commands, Query, Res, ResMut, Resource},
 };
+use azalea::prelude::bevy_ecs;
 use bevy_tasks::{IoTaskPool, Task};
 use futures_lite::future;
 use log::{error, warn};

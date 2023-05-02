@@ -1,21 +1,23 @@
 //! An Azalea plugin that helps you avoid getting kicked for spamming or for
 //! sending illegal chat messages.
 
-use azalea::ecs::{component::Component, AppTickExt};
-use bevy_app::{App, Plugin};
-use bevy_ecs::{
+use azalea::app::{App, CoreSchedule, IntoSystemAppConfig, Plugin};
+use azalea::ecs::{
+    component::Component,
     entity::Entity,
     event::{EventReader, EventWriter},
     system::{Commands, Query},
 };
+use azalea::prelude::bevy_ecs;
 
 pub struct AvoidKickPlugin;
 
 impl Plugin for AvoidKickPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<SendChatEvent>()
-            .add_system(send_chat_listener)
-            .add_tick_system(drain_chat_message_queue);
+        app.add_event::<SendChatEvent>().add_systems((
+            send_chat_listener,
+            drain_chat_message_queue.in_schedule(CoreSchedule::FixedUpdate),
+        ));
     }
 }
 

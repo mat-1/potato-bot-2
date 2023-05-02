@@ -1,14 +1,13 @@
 use std::collections::VecDeque;
 
 use azalea::{
+    app::{App, CoreSchedule, IntoSystemAppConfig, Plugin},
     ecs::{
-        app::{App, Plugin},
         event::{EventReader, EventWriter},
-        AppTickExt,
+        system::{Res, ResMut},
     },
     prelude::*,
 };
-use bevy_ecs::system::{Res, ResMut};
 
 use crate::{
     azalea_bridge::{
@@ -32,7 +31,7 @@ impl Plugin for DiscordBridgePlugin {
         .add_system(minecraft_to_discord_queue)
         .add_system(discord_to_minecraft)
         .add_system(handle_bridge_info_events)
-        .add_tick_system(flush_to_discord_queue);
+        .add_system(flush_to_discord_queue.in_schedule(CoreSchedule::FixedUpdate));
     }
 }
 

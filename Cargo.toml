@@ -8,10 +8,8 @@ version = "0.1.0"
 [dependencies]
 anyhow = "1.0.66"
 async-compat = "0.2.1"
-azalea = {git = "https://github.com/mat-1/azalea", branch = "1.19.2"}
-azalea-protocol = {git = "https://github.com/mat-1/azalea", branch = "1.19.2"}
-bevy_app = "0.9.1"
-bevy_ecs = "0.9.1"
+azalea = { git = "https://github.com/mat-1/azalea" }
+azalea-protocol = { git = "https://github.com/mat-1/azalea" }
 bevy_tasks = "0.9.1"
 dotenv = "0.15.0"
 env_logger = "0.10.0"
@@ -19,7 +17,7 @@ futures-lite = "1.12.0"
 log = "0.4.17"
 matrix-sdk = "0.6.2"
 parking_lot = "0.12.1"
-tokio = {version = "1.23.0", features = ["full"]}
+tokio = { version = "1.23.0", features = ["full"] }
 twilight-cache-inmemory = "0.15.0"
 twilight-gateway = "0.15.0"
 twilight-http = "0.15.0"
