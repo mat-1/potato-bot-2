@@ -4,6 +4,7 @@ use std::{num::NonZeroU64, sync::Arc};
 
 use async_compat::Compat;
 use azalea::app::{App, Plugin};
+use azalea::ecs::schedule::IntoSystemConfigs;
 use azalea::ecs::{
     component::Component,
     entity::Entity,
@@ -54,9 +55,14 @@ impl Plugin for DiscordPlugin {
             .add_event::<send::CreateMessage>()
             .add_event::<send::CreateReaction>()
             .add_system(handle_from_discord_events)
-            .add_system(handle_create_message)
-            .add_system(handle_create_message_response)
-            .add_system(handle_create_reaction)
+            .add_systems(
+                (
+                    handle_create_message,
+                    handle_create_message_response,
+                    handle_create_reaction,
+                )
+                    .after(handle_from_discord_events),
+            )
             .add_system(handle_empty_body_response);
 
         app.insert_resource(Discord::new(self.token.clone(), self.intents));
@@ -86,7 +92,7 @@ impl Discord {
 }
 
 #[derive(Resource)]
-struct Discord {
+pub struct Discord {
     pub http: Arc<HttpClient>,
     pub cache: InMemoryCache,
     rx: mpsc::UnboundedReceiver<Result<Event, ReceiveMessageError>>,
@@ -111,7 +117,7 @@ async fn loop_get_next_events(
     }
 }
 
-fn handle_from_discord_events(
+pub fn handle_from_discord_events(
     mut discord: ResMut<Discord>,
     mut message_create_events: EventWriter<recv::MessageCreate>,
 ) {
@@ -187,7 +193,7 @@ fn handle_create_message_response(
     }
 }
 
-fn handle_create_reaction(
+pub fn handle_create_reaction(
     mut commands: Commands,
     discord: Res<Discord>,
     mut events: EventReader<send::CreateReaction>,

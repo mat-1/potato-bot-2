@@ -57,7 +57,7 @@ fn message_legal_to_minecraft(message: &str) -> bool {
     true
 }
 
-fn send_chat_listener(
+pub fn send_chat_listener(
     mut commands: Commands,
     mut events: EventReader<SendChatEvent>,
     mut query: Query<Option<&mut AvoidChatKick>>,

@@ -27,8 +27,7 @@ struct SwarmState;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    dotenv::dotenv().expect("Failed to load .env file");
-    env_logger::init();
+    let _ = dotenv::dotenv();
 
     {
         use parking_lot::deadlock;

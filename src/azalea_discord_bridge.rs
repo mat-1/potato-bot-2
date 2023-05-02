@@ -4,6 +4,7 @@ use azalea::{
     app::{App, CoreSchedule, IntoSystemAppConfig, Plugin},
     ecs::{
         event::{EventReader, EventWriter},
+        schedule::IntoSystemConfig,
         system::{Res, ResMut},
     },
     prelude::*,
@@ -11,9 +12,10 @@ use azalea::{
 
 use crate::{
     azalea_bridge::{
-        BridgeInfoEvent, BridgeInfoKind, BridgePlugin, FromMinecraftEvent, ToMinecraftEvent,
+        from_minecraft, pop_no_longer_recent_messages, to_minecraft, BridgeInfoEvent,
+        BridgeInfoKind, BridgePlugin, FromMinecraftEvent, ToMinecraftEvent,
     },
-    bevy_discord,
+    bevy_discord::{self, handle_create_reaction, handle_from_discord_events},
 };
 
 pub struct DiscordBridgePlugin {
@@ -28,10 +30,19 @@ impl Plugin for DiscordBridgePlugin {
             discord_ratelimit: 0,
         })
         .add_plugin(BridgePlugin::<DiscordContext>::default())
-        .add_system(minecraft_to_discord_queue)
-        .add_system(discord_to_minecraft)
-        .add_system(handle_bridge_info_events)
-        .add_system(flush_to_discord_queue.in_schedule(CoreSchedule::FixedUpdate));
+        .add_systems((
+            minecraft_to_discord_queue
+                .after(from_minecraft)
+                .after(pop_no_longer_recent_messages)
+                .after(discord_to_minecraft),
+            discord_to_minecraft
+                .after(handle_from_discord_events)
+                .after(to_minecraft::<DiscordContext>),
+            handle_bridge_info_events
+                .before(handle_create_reaction)
+                .before(to_minecraft::<DiscordContext>),
+            flush_to_discord_queue.in_schedule(CoreSchedule::FixedUpdate),
+        ));
     }
 }
 

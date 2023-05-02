@@ -13,7 +13,7 @@ use azalea::{
         entity::Entity,
         event::{EventReader, EventWriter},
         query::With,
-        schedule::IntoSystemConfig,
+        schedule::{IntoSystemConfig, IntoSystemConfigs},
         system::Query,
         system::{ResMut, Resource},
     },
@@ -22,7 +22,7 @@ use azalea::{
     GameProfileComponent,
 };
 
-use crate::azalea_avoid_chat_kick;
+use crate::azalea_avoid_chat_kick::{self, send_chat_listener};
 
 pub struct BridgePlugin<T: Clone + Sync + Send + 'static>(std::marker::PhantomData<T>);
 impl<T: Clone + Sync + Send + 'static> Default for BridgePlugin<T> {
@@ -37,9 +37,14 @@ impl<T: Clone + Sync + Send + 'static> Plugin for BridgePlugin<T> {
             .add_event::<ToMinecraftEvent<T>>()
             .add_event::<BridgeInfoEvent<T>>()
             .init_resource::<RecentFromMinecraft>()
-            .add_system(from_minecraft)
-            .add_system(to_minecraft::<T>)
-            .add_system(pop_no_longer_recent_messages.after(from_minecraft));
+            .add_systems(
+                (
+                    from_minecraft.before(send_chat_listener),
+                    pop_no_longer_recent_messages,
+                )
+                    .chain(),
+            )
+            .add_system(to_minecraft::<T>.before(send_chat_listener));
     }
 }
 
@@ -90,7 +95,7 @@ impl DerefMut for RecentFromMinecraft {
     }
 }
 
-fn from_minecraft(
+pub fn from_minecraft(
     mut recent_from_minecraft: ResMut<RecentFromMinecraft>,
     mut events: EventReader<azalea::chat::ChatReceivedEvent>,
     mut from_minecraft_events: EventWriter<FromMinecraftEvent>,
@@ -146,7 +151,7 @@ fn from_minecraft(
     }
 }
 
-fn to_minecraft<T: Clone + Sync + Send + 'static>(
+pub fn to_minecraft<T: Clone + Sync + Send + 'static>(
     query: Query<Entity, With<Local>>,
     mut events: EventReader<ToMinecraftEvent<T>>,
     mut send_chat_events: EventWriter<azalea_avoid_chat_kick::SendChatEvent>,
@@ -188,7 +193,7 @@ fn to_minecraft<T: Clone + Sync + Send + 'static>(
     }
 }
 
-fn pop_no_longer_recent_messages(
+pub fn pop_no_longer_recent_messages(
     mut recent_from_minecraft: ResMut<RecentFromMinecraft>,
     mut from_minecraft_events: EventWriter<FromMinecraftEvent>,
 ) {
