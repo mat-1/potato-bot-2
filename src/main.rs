@@ -145,7 +145,7 @@ async fn swarm_handle(
                 if username != "py5" {
                     return Ok(());
                 }
-                let _ = state.commands.execute(content.into(), Arc::new(swarm));
+                let _ = state.commands.execute(content, swarm);
             }
         }
         SwarmEvent::Disconnect(account) => {

@@ -110,16 +110,22 @@ fn discord_to_minecraft(
     mut to_minecraft_events: EventWriter<ToMinecraftEvent<DiscordContext>>,
 ) {
     for event in events.iter() {
-        if event.author.bot {
+        if event.author.bot && event.author.discriminator != 0 {
             return;
         }
         if event.channel_id.get() != discord_bridge.channel_id {
             return;
         }
 
+        let display_name = if event.author.discriminator == 0 {
+            event.author.name.clone()
+        } else {
+            format!("{}#{:0>4}", event.author.name, event.author.discriminator)
+        };
+
         to_minecraft_events.send(ToMinecraftEvent {
             content: event.content.clone(),
-            username: format!("{}#{:0>4}", event.author.name, event.author.discriminator),
+            username: display_name,
             context: DiscordContext {
                 channel_id: event.channel_id.get(),
                 message_id: event.id.get(),
