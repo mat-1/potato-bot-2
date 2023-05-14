@@ -8,8 +8,8 @@ version = "0.1.0"
 [dependencies]
 anyhow = "1.0.66"
 async-compat = "0.2.1"
-azalea = { git = "https://github.com/mat-1/azalea" }
-# azalea = { path = "../azalea/azalea" }
+# azalea = { git = "https://github.com/mat-1/azalea" }
+azalea = { path = "../azalea/azalea" }
 bevy_tasks = "0.10.0"
 dotenv = "0.15.0"
 futures-lite = "1.12.0"

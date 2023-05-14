@@ -164,6 +164,7 @@ fn handle_create_message(
 
     for event in events.iter() {
         let content = event.content.clone();
+
         let channel_id = event.channel_id;
 
         let http = discord.http.clone();

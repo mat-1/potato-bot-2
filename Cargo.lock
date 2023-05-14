@@ -255,7 +255,6 @@ checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 [[package]]
 name = "azalea"
 version = "0.6.0"
-source = "git+https://github.com/mat-1/azalea#741a1f65d669c83710e8c33082b120c189b28f1d"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -289,7 +288,6 @@ dependencies = [
 [[package]]
 name = "azalea-auth"
 version = "0.6.0"
-source = "git+https://github.com/mat-1/azalea#741a1f65d669c83710e8c33082b120c189b28f1d"
 dependencies = [
  "azalea-buf",
  "azalea-crypto",
@@ -307,7 +305,6 @@ dependencies = [
 [[package]]
 name = "azalea-block"
 version = "0.6.0"
-source = "git+https://github.com/mat-1/azalea#741a1f65d669c83710e8c33082b120c189b28f1d"
 dependencies = [
  "azalea-block-macros",
  "azalea-buf",
@@ -317,7 +314,6 @@ dependencies = [
 [[package]]
 name = "azalea-block-macros"
 version = "0.6.0"
-source = "git+https://github.com/mat-1/azalea#741a1f65d669c83710e8c33082b120c189b28f1d"
 dependencies = [
  "proc-macro2 1.0.56",
  "quote 1.0.27",
@@ -327,7 +323,6 @@ dependencies = [
 [[package]]
 name = "azalea-brigadier"
 version = "0.6.0"
-source = "git+https://github.com/mat-1/azalea#741a1f65d669c83710e8c33082b120c189b28f1d"
 dependencies = [
  "azalea-buf",
  "azalea-chat",
@@ -337,7 +332,6 @@ dependencies = [
 [[package]]
 name = "azalea-buf"
 version = "0.6.0"
-source = "git+https://github.com/mat-1/azalea#741a1f65d669c83710e8c33082b120c189b28f1d"
 dependencies = [
  "azalea-buf-macros",
  "byteorder",
@@ -350,7 +344,6 @@ dependencies = [
 [[package]]
 name = "azalea-buf-macros"
 version = "0.6.0"
-source = "git+https://github.com/mat-1/azalea#741a1f65d669c83710e8c33082b120c189b28f1d"
 dependencies = [
  "proc-macro2 1.0.56",
  "quote 1.0.27",
@@ -360,7 +353,6 @@ dependencies = [
 [[package]]
 name = "azalea-chat"
 version = "0.6.0"
-source = "git+https://github.com/mat-1/azalea#741a1f65d669c83710e8c33082b120c189b28f1d"
 dependencies = [
  "azalea-buf",
  "azalea-language",
@@ -373,7 +365,6 @@ dependencies = [
 [[package]]
 name = "azalea-client"
 version = "0.6.0"
-source = "git+https://github.com/mat-1/azalea#741a1f65d669c83710e8c33082b120c189b28f1d"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -407,7 +398,6 @@ dependencies = [
 [[package]]
 name = "azalea-core"
 version = "0.6.0"
-source = "git+https://github.com/mat-1/azalea#741a1f65d669c83710e8c33082b120c189b28f1d"
 dependencies = [
  "azalea-buf",
  "azalea-chat",
@@ -423,7 +413,6 @@ dependencies = [
 [[package]]
 name = "azalea-crypto"
 version = "0.6.0"
-source = "git+https://github.com/mat-1/azalea#741a1f65d669c83710e8c33082b120c189b28f1d"
 dependencies = [
  "aes",
  "azalea-buf",
@@ -438,7 +427,6 @@ dependencies = [
 [[package]]
 name = "azalea-inventory"
 version = "0.1.0"
-source = "git+https://github.com/mat-1/azalea#741a1f65d669c83710e8c33082b120c189b28f1d"
 dependencies = [
  "azalea-buf",
  "azalea-inventory-macros",
@@ -449,7 +437,6 @@ dependencies = [
 [[package]]
 name = "azalea-inventory-macros"
 version = "0.1.0"
-source = "git+https://github.com/mat-1/azalea#741a1f65d669c83710e8c33082b120c189b28f1d"
 dependencies = [
  "proc-macro2 1.0.56",
  "quote 1.0.27",
@@ -459,7 +446,6 @@ dependencies = [
 [[package]]
 name = "azalea-language"
 version = "0.6.0"
-source = "git+https://github.com/mat-1/azalea#741a1f65d669c83710e8c33082b120c189b28f1d"
 dependencies = [
  "once_cell",
  "serde",
@@ -469,7 +455,6 @@ dependencies = [
 [[package]]
 name = "azalea-nbt"
 version = "0.6.0"
-source = "git+https://github.com/mat-1/azalea#741a1f65d669c83710e8c33082b120c189b28f1d"
 dependencies = [
  "azalea-buf",
  "byteorder",
@@ -484,7 +469,6 @@ dependencies = [
 [[package]]
 name = "azalea-physics"
 version = "0.6.0"
-source = "git+https://github.com/mat-1/azalea#741a1f65d669c83710e8c33082b120c189b28f1d"
 dependencies = [
  "azalea-block",
  "azalea-core",
@@ -500,7 +484,6 @@ dependencies = [
 [[package]]
 name = "azalea-protocol"
 version = "0.6.0"
-source = "git+https://github.com/mat-1/azalea#741a1f65d669c83710e8c33082b120c189b28f1d"
 dependencies = [
  "async-compression",
  "async-recursion",
@@ -535,7 +518,6 @@ dependencies = [
 [[package]]
 name = "azalea-protocol-macros"
 version = "0.6.0"
-source = "git+https://github.com/mat-1/azalea#741a1f65d669c83710e8c33082b120c189b28f1d"
 dependencies = [
  "proc-macro2 1.0.56",
  "quote 1.0.27",
@@ -545,7 +527,6 @@ dependencies = [
 [[package]]
 name = "azalea-registry"
 version = "0.6.0"
-source = "git+https://github.com/mat-1/azalea#741a1f65d669c83710e8c33082b120c189b28f1d"
 dependencies = [
  "azalea-buf",
  "azalea-registry-macros",
@@ -555,7 +536,6 @@ dependencies = [
 [[package]]
 name = "azalea-registry-macros"
 version = "0.6.0"
-source = "git+https://github.com/mat-1/azalea#741a1f65d669c83710e8c33082b120c189b28f1d"
 dependencies = [
  "proc-macro2 1.0.56",
  "quote 1.0.27",
@@ -565,7 +545,6 @@ dependencies = [
 [[package]]
 name = "azalea-world"
 version = "0.6.0"
-source = "git+https://github.com/mat-1/azalea#741a1f65d669c83710e8c33082b120c189b28f1d"
 dependencies = [
  "azalea-block",
  "azalea-buf",
@@ -2620,22 +2599,22 @@ dependencies = [
 
 [[package]]
 name = "pin-project"
-version = "1.0.12"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad29a609b6bcd67fee905812e544992d216af9d755757c05ed2d0e15a74c6ecc"
+checksum = "c95a7476719eab1e366eaf73d0260af3021184f18177925b07f54b30089ceead"
 dependencies = [
  "pin-project-internal",
 ]
 
 [[package]]
 name = "pin-project-internal"
-version = "1.0.12"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "069bdb1e05adc7a8990dce9cc75370895fbe4e3d58b9b73bf1aee56359344a55"
+checksum = "39407670928234ebc5e6e580247dd567ad73a3578460c5990f9503df207e8f07"
 dependencies = [
  "proc-macro2 1.0.56",
  "quote 1.0.27",
- "syn 1.0.109",
+ "syn 2.0.15",
 ]
 
 [[package]]

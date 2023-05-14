@@ -123,8 +123,16 @@ fn discord_to_minecraft(
             format!("{}#{:0>4}", event.author.name, event.author.discriminator)
         };
 
+        let mut content = event.content.clone();
+        for attachment in event.attachments.iter() {
+            if !content.is_empty() {
+                content.push(' ');
+            }
+            content.push_str(&attachment.url)
+        }
+
         to_minecraft_events.send(ToMinecraftEvent {
-            content: event.content.clone(),
+            content,
             username: display_name,
             context: DiscordContext {
                 channel_id: event.channel_id.get(),

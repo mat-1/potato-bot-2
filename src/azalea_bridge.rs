@@ -107,10 +107,14 @@ pub fn from_minecraft(
             event.packet.message().to_ansi()
         );
 
+        if event.packet.is_whisper() {
+            continue;
+        }
+
         let game_profile = query.single();
         if event.packet.username() == Some(game_profile.name.clone()) {
             // we sent this message lol
-            return;
+            continue;
         }
 
         let message_string = event.packet.message().to_string();
@@ -135,7 +139,7 @@ pub fn from_minecraft(
                         packet: event.packet.clone(),
                     });
                 }
-                return;
+                continue;
             }
         }
         recent_from_minecraft.push_back(RecentMessage {

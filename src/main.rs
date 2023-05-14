@@ -1,7 +1,9 @@
 #![feature(async_closure)]
 #![feature(trivial_bounds)]
 
-use azalea::Account;
+use azalea::entity::Position;
+use azalea::pathfinder::BlockPosGoal;
+use azalea::{Account, BlockPos, GameProfileComponent};
 
 mod azalea_avoid_chat_kick;
 mod azalea_bridge;
@@ -12,11 +14,13 @@ mod bevy_discord;
 use azalea::brigadier::builder::literal_argument_builder::literal;
 use azalea::brigadier::command_dispatcher::CommandDispatcher;
 use azalea::brigadier::context::CommandContext;
+use azalea::chat::ChatPacket;
+use azalea::ecs::prelude::*;
+use azalea::entity::metadata::Player;
 use azalea::prelude::*;
-use azalea::protocol::packets::game::serverbound_client_command_packet::ServerboundClientCommandPacket;
 use azalea::swarm::prelude::*;
+use parking_lot::Mutex;
 use std::env;
-use std::ops::Deref;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
@@ -75,12 +79,44 @@ async fn main() -> anyhow::Result<()> {
 
     let mut commands = CommandDispatcher::new();
 
-    commands.register(literal("ping").executes(|ctx: &CommandContext<Swarm>| {
-        for bot in ctx.source.deref().clone().into_iter() {
-            bot.chat("pong!");
-        }
-        1
-    }));
+    commands.register(
+        literal("ping").executes(|ctx: &CommandContext<Mutex<CommandSource>>| {
+            let source = ctx.source.lock();
+            source.reply("pong!");
+            1
+        }),
+    );
+
+    commands.register(literal("whereami").executes(
+        |ctx: &CommandContext<Mutex<CommandSource>>| {
+            let mut source = ctx.source.lock();
+            let Some(entity) = source.entity() else {
+                source.reply("You aren't in render distance!");
+                return 0;
+            };
+            let position = source.bot.entity_component::<Position>(entity);
+            source.reply(&format!(
+                "You are at {}, {}, {}",
+                position.x, position.y, position.z
+            ));
+            1
+        },
+    ));
+
+    commands.register(
+        literal("goto").executes(|ctx: &CommandContext<Mutex<CommandSource>>| {
+            let mut source = ctx.source.lock();
+            let Some(entity) = source.entity() else {
+                source.reply("You aren't in render distance!");
+                return 0;
+            };
+            let position = source.bot.entity_component::<Position>(entity);
+            source
+                .bot
+                .goto(BlockPosGoal::from(BlockPos::from(position)));
+            1
+        }),
+    );
 
     let commands = Arc::new(commands);
 
@@ -98,10 +134,12 @@ async fn main() -> anyhow::Result<()> {
         let error = builder
             .set_handler(handle)
             .set_swarm_handler(swarm_handle)
-            .set_swarm_state(SwarmState {
-                commands: commands.clone(),
-            })
-            .add_account(account.clone())
+            .add_account_with_state(
+                account.clone(),
+                State {
+                    commands: commands.clone(),
+                },
+            )
             .start(
                 env::var("SERVER_IP")
                     .expect("Expected SERVER_IP in env")
@@ -113,21 +151,58 @@ async fn main() -> anyhow::Result<()> {
     }
 }
 
-#[derive(Component, Default, Clone)]
-pub struct State;
-
-#[derive(Resource, Default, Clone)]
-struct SwarmState {
-    pub commands: Arc<CommandDispatcher<Swarm>>,
+pub struct CommandSource {
+    pub bot: Client,
+    pub chat: ChatPacket,
 }
 
-async fn handle(bot: Client, event: Event, _state: State) -> anyhow::Result<()> {
+impl CommandSource {
+    pub fn reply(&self, message: &str) {
+        if self.chat.is_whisper() {
+            self.bot
+                .chat(&format!("/w {} {}", self.chat.username().unwrap(), message));
+        } else {
+            self.bot.chat(message);
+        }
+    }
+
+    pub fn entity(&mut self) -> Option<Entity> {
+        let username = self.chat.username()?;
+        self.bot
+            .entity_by::<With<Player>, (&GameProfileComponent,)>(
+                |profile: &&GameProfileComponent| profile.name == username,
+            )
+    }
+}
+
+#[derive(Component, Default, Clone)]
+pub struct State {
+    pub commands: Arc<CommandDispatcher<Mutex<CommandSource>>>,
+}
+
+#[derive(Resource, Default, Clone)]
+struct SwarmState;
+
+async fn handle(bot: Client, event: azalea::Event, state: State) -> anyhow::Result<()> {
     match event {
         azalea::Event::Login => {}
-        azalea::Event::Death(_) => {
-            bot.write_packet(ServerboundClientCommandPacket {
-                action: azalea::protocol::packets::game::serverbound_client_command_packet::Action::PerformRespawn,
-            }.get());
+        azalea::Event::Chat(chat) => {
+            println!("{}", chat.message().to_ansi());
+            if let (Some(username), content) = chat.split_sender_and_content() {
+                if username != "py5" {
+                    return Ok(());
+                }
+
+                println!("{:?}", chat.message());
+
+                let _ = state.commands.execute(
+                    content,
+                    Mutex::new(CommandSource {
+                        bot,
+                        chat: chat.clone(),
+                    }),
+                );
+            }
         }
         _ => {}
     }
@@ -140,14 +215,6 @@ async fn swarm_handle(
     state: SwarmState,
 ) -> anyhow::Result<()> {
     match &event {
-        SwarmEvent::Chat(chat) => {
-            if let (Some(username), content) = chat.split_sender_and_content() {
-                if username != "py5" {
-                    return Ok(());
-                }
-                let _ = state.commands.execute(content, swarm);
-            }
-        }
         SwarmEvent::Disconnect(account) => {
             println!("bot got kicked! {}", account.username);
             tokio::time::sleep(Duration::from_secs(5)).await;
