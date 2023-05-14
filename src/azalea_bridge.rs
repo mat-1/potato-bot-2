@@ -173,7 +173,7 @@ pub fn to_minecraft<T: Clone + Sync + Send + 'static>(
             };
 
         // check if a message is legal and add it to the queue!
-        let message_content = if event.content == "/list" {
+        let message_content = if event.content == "/tps" {
             event.content.clone()
         } else {
             format!("/me <{}> {}", event.username, event.content)
