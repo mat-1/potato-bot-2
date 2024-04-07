@@ -1,7 +1,9 @@
 //! An Azalea plugin that helps you avoid getting kicked for spamming or for
 //! sending illegal chat messages.
 
-use azalea::app::{App, CoreSchedule, IntoSystemAppConfig, Plugin};
+use azalea::app::{App, Plugin, Update};
+use azalea::core::tick::GameTick;
+use azalea::ecs::event::Event;
 use azalea::ecs::{
     component::Component,
     entity::Entity,
@@ -14,10 +16,9 @@ pub struct AvoidKickPlugin;
 
 impl Plugin for AvoidKickPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<SendChatEvent>().add_systems((
-            send_chat_listener,
-            drain_chat_message_queue.in_schedule(CoreSchedule::FixedUpdate),
-        ));
+        app.add_event::<SendChatEvent>()
+            .add_systems(Update, (send_chat_listener,))
+            .add_systems(GameTick, drain_chat_message_queue);
     }
 }
 
@@ -27,6 +28,7 @@ pub struct AvoidChatKick {
     pub chat_spam_tick_count: usize,
 }
 
+#[derive(Event)]
 pub struct SendChatEvent {
     entity: Entity,
     content: String,
@@ -62,7 +64,7 @@ pub fn send_chat_listener(
     mut events: EventReader<SendChatEvent>,
     mut query: Query<Option<&mut AvoidChatKick>>,
 ) {
-    for event in events.iter() {
+    for event in events.read() {
         let Ok(state) = query.get_mut(event.entity) else {
             continue;
         };

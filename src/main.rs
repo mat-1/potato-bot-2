@@ -2,8 +2,8 @@
 #![feature(trivial_bounds)]
 
 use azalea::entity::Position;
-use azalea::pathfinder::BlockPosGoal;
-use azalea::{Account, BlockPos, GameProfileComponent};
+use azalea::pathfinder::goals::BlockPosGoal;
+use azalea::{BlockPos, GameProfileComponent};
 
 mod azalea_avoid_chat_kick;
 mod azalea_bridge;
@@ -111,9 +111,7 @@ async fn main() -> anyhow::Result<()> {
                 return 0;
             };
             let position = source.bot.entity_component::<Position>(entity);
-            source
-                .bot
-                .goto(BlockPosGoal::from(BlockPos::from(position)));
+            source.bot.goto(BlockPosGoal(BlockPos::from(position)));
             1
         }),
     );
@@ -121,15 +119,16 @@ async fn main() -> anyhow::Result<()> {
     let commands = Arc::new(commands);
 
     loop {
-        let mut builder = SwarmBuilder::new().add_plugin(AvoidKickPlugin);
+        let mut builder = SwarmBuilder::new().add_plugins(AvoidKickPlugin);
         if let Ok(token) = token.clone() {
             let channel_id = channel_id.expect("Expected DISCORD_CHANNEL_ID in env");
-            builder = builder
-                .add_plugin(DiscordPlugin {
+            builder = builder.add_plugins((
+                DiscordPlugin {
                     token: token.clone(),
                     intents: Intents::GUILD_MESSAGES | Intents::MESSAGE_CONTENT,
-                })
-                .add_plugin(DiscordBridgePlugin { channel_id });
+                },
+                DiscordBridgePlugin { channel_id },
+            ));
         };
         let error = builder
             .set_handler(handle)
@@ -170,7 +169,7 @@ impl CommandSource {
         let username = self.chat.username()?;
         self.bot
             .entity_by::<With<Player>, (&GameProfileComponent,)>(
-                |profile: &&GameProfileComponent| profile.name == username,
+                |(profile,): &(&GameProfileComponent,)| profile.name == username,
             )
     }
 }
@@ -212,15 +211,13 @@ async fn handle(bot: Client, event: azalea::Event, state: State) -> anyhow::Resu
 async fn swarm_handle(
     mut swarm: Swarm,
     event: SwarmEvent,
-    state: SwarmState,
+    _state: SwarmState,
 ) -> anyhow::Result<()> {
     match &event {
         SwarmEvent::Disconnect(account) => {
             println!("bot got kicked! {}", account.username);
             tokio::time::sleep(Duration::from_secs(5)).await;
-            swarm
-                .add_with_exponential_backoff(account, State::default())
-                .await;
+            swarm.add_and_retry_forever(account, State::default()).await;
         }
         _ => {}
     }

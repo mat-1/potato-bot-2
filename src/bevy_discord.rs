@@ -3,7 +3,7 @@
 use std::{num::NonZeroU64, sync::Arc};
 
 use async_compat::Compat;
-use azalea::app::{App, Plugin};
+use azalea::app::{App, Plugin, Update};
 use azalea::ecs::schedule::IntoSystemConfigs;
 use azalea::ecs::{
     component::Component,
@@ -26,17 +26,25 @@ use twilight_http::{
 use twilight_model::channel::{message::AllowedMentions, Message};
 use twilight_validate::message::MessageValidationError;
 
+use self::recv::MessageCreate;
+
 pub mod recv {
+    use azalea::ecs as bevy_ecs;
     pub use twilight_gateway::Event;
-    pub use twilight_model::gateway::payload::incoming::MessageCreate;
+
+    #[derive(Debug, azalea::ecs::event::Event)]
+    pub struct MessageCreate(pub twilight_model::gateway::payload::incoming::MessageCreate);
 }
 pub mod send {
-    #[derive(Debug)]
+    use azalea::ecs as bevy_ecs;
+    use azalea::ecs::event::Event;
+
+    #[derive(Debug, Event)]
     pub struct CreateMessage {
         pub channel_id: u64,
         pub content: String,
     }
-    #[derive(Debug)]
+    #[derive(Debug, Event)]
     pub struct CreateReaction {
         pub channel_id: u64,
         pub message_id: u64,
@@ -54,8 +62,9 @@ impl Plugin for DiscordPlugin {
         app.add_event::<recv::MessageCreate>()
             .add_event::<send::CreateMessage>()
             .add_event::<send::CreateReaction>()
-            .add_system(handle_from_discord_events)
+            .add_systems(Update, handle_from_discord_events)
             .add_systems(
+                Update,
                 (
                     handle_create_message,
                     handle_create_message_response,
@@ -63,7 +72,7 @@ impl Plugin for DiscordPlugin {
                 )
                     .after(handle_from_discord_events),
             )
-            .add_system(handle_empty_body_response);
+            .add_systems(Update, handle_empty_body_response);
 
         app.insert_resource(Discord::new(self.token.clone(), self.intents));
     }
@@ -144,7 +153,9 @@ pub fn handle_from_discord_events(
         };
         discord.cache.update(&event);
         match event {
-            recv::Event::MessageCreate(m) => message_create_events.send(*m),
+            recv::Event::MessageCreate(m) => {
+                message_create_events.send(MessageCreate(*m));
+            }
             _ => {}
         }
     }
@@ -162,7 +173,7 @@ fn handle_create_message(
 ) {
     let task_pool = IoTaskPool::get();
 
-    for event in events.iter() {
+    for event in events.read() {
         let content = event.content.clone();
 
         let channel_id = event.channel_id;
@@ -187,7 +198,9 @@ fn handle_create_message_response(
     mut query: Query<(Entity, &mut DiscordResponseTask<Message>)>,
 ) {
     for (entity, mut response) in &mut query {
-        let Some(_result) = future::block_on(future::poll_once(&mut response.0)) else { continue };
+        let Some(_result) = future::block_on(future::poll_once(&mut response.0)) else {
+            continue;
+        };
         commands
             .entity(entity)
             .remove::<DiscordResponseTask<Message>>();
@@ -201,7 +214,7 @@ pub fn handle_create_reaction(
 ) {
     let task_pool = IoTaskPool::get();
 
-    for event in events.iter() {
+    for event in events.read() {
         let channel_id = event.channel_id;
         let message_id = event.message_id;
         let emoji = event.emoji;
@@ -227,7 +240,9 @@ fn handle_empty_body_response(
     mut query: Query<(Entity, &mut DiscordResponseTask<EmptyBody>)>,
 ) {
     for (entity, mut response) in &mut query {
-        let Some(_result) = future::block_on(future::poll_once(&mut response.0)) else { continue };
+        let Some(_result) = future::block_on(future::poll_once(&mut response.0)) else {
+            continue;
+        };
         commands
             .entity(entity)
             .remove::<DiscordResponseTask<EmptyBody>>();

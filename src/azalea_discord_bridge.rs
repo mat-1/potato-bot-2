@@ -1,10 +1,10 @@
 use std::collections::VecDeque;
 
 use azalea::{
-    app::{App, CoreSchedule, IntoSystemAppConfig, Plugin},
+    app::{App, Plugin, Update},
     ecs::{
         event::{EventReader, EventWriter},
-        schedule::IntoSystemConfig,
+        schedule::IntoSystemConfigs,
         system::{Res, ResMut},
     },
     prelude::*,
@@ -29,20 +29,23 @@ impl Plugin for DiscordBridgePlugin {
             discord_queue: VecDeque::new(),
             discord_ratelimit: 0,
         })
-        .add_plugin(BridgePlugin::<DiscordContext>::default())
-        .add_systems((
-            minecraft_to_discord_queue
-                .after(from_minecraft)
-                .after(pop_no_longer_recent_messages)
-                .after(discord_to_minecraft),
-            discord_to_minecraft
-                .after(handle_from_discord_events)
-                .after(to_minecraft::<DiscordContext>),
-            handle_bridge_info_events
-                .before(handle_create_reaction)
-                .before(to_minecraft::<DiscordContext>),
-            flush_to_discord_queue.in_schedule(CoreSchedule::FixedUpdate),
-        ));
+        .add_plugins(BridgePlugin::<DiscordContext>::default())
+        .add_systems(
+            Update,
+            (
+                minecraft_to_discord_queue
+                    .after(from_minecraft)
+                    .after(pop_no_longer_recent_messages)
+                    .after(discord_to_minecraft),
+                discord_to_minecraft
+                    .after(handle_from_discord_events)
+                    .after(to_minecraft::<DiscordContext>),
+                handle_bridge_info_events
+                    .before(handle_create_reaction)
+                    .before(to_minecraft::<DiscordContext>),
+            ),
+        )
+        .add_systems(GameTick, flush_to_discord_queue);
     }
 }
 
@@ -64,7 +67,7 @@ fn minecraft_to_discord_queue(
     mut discord_bridge: ResMut<DiscordBridge>,
     mut events: EventReader<FromMinecraftEvent>,
 ) {
-    for event in events.iter() {
+    for event in events.read() {
         let content = event
             .content
             .to_string()
@@ -109,7 +112,7 @@ fn discord_to_minecraft(
     mut events: EventReader<bevy_discord::recv::MessageCreate>,
     mut to_minecraft_events: EventWriter<ToMinecraftEvent<DiscordContext>>,
 ) {
-    for event in events.iter() {
+    for bevy_discord::recv::MessageCreate(event) in events.read() {
         if event.author.bot && event.author.discriminator != 0 {
             return;
         }
@@ -146,7 +149,7 @@ fn handle_bridge_info_events(
     mut events: EventReader<BridgeInfoEvent<DiscordContext>>,
     mut react_events: EventWriter<bevy_discord::send::CreateReaction>,
 ) {
-    for event in events.iter() {
+    for event in events.read() {
         match event.kind {
             BridgeInfoKind::Ack => {
                 react_events.send(bevy_discord::send::CreateReaction {
