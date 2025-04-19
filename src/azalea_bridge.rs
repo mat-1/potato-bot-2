@@ -6,21 +6,9 @@ use std::{
     time::Instant,
 };
 
-use azalea::{
-    app::{App, Plugin},
-    chat::ChatPacket,
-    ecs::{
-        entity::Entity,
-        event::{EventReader, EventWriter},
-        query::With,
-        schedule::{IntoSystemConfig, IntoSystemConfigs},
-        system::Query,
-        system::{ResMut, Resource},
-    },
-    entity::Local,
-    prelude::bevy_ecs,
-    GameProfileComponent,
-};
+use azalea::{app::prelude::*, chat::ChatPacket};
+use azalea::{ecs::prelude::*, GameProfileComponent};
+use azalea::{entity::LocalEntity, prelude::*};
 
 use crate::azalea_avoid_chat_kick::{self, send_chat_listener};
 
@@ -38,31 +26,37 @@ impl<T: Clone + Sync + Send + 'static> Plugin for BridgePlugin<T> {
             .add_event::<BridgeInfoEvent<T>>()
             .init_resource::<RecentFromMinecraft>()
             .add_systems(
+                Update,
                 (
-                    from_minecraft.before(send_chat_listener),
-                    pop_no_longer_recent_messages,
-                )
-                    .chain(),
-            )
-            .add_system(to_minecraft::<T>.before(send_chat_listener));
+                    (
+                        from_minecraft.before(send_chat_listener),
+                        pop_no_longer_recent_messages,
+                    )
+                        .chain(),
+                    to_minecraft::<T>.before(send_chat_listener),
+                ),
+            );
     }
 }
 
 /// We received a message from Minecraft. This is what you should show in your
 /// bridge. This may not be exactly the same message shown in Minecraft, since
 /// it attempts to de-duplicate messages.
+#[derive(Event)]
 pub struct FromMinecraftEvent {
     pub content: String,
-    pub packet: ChatPacket,
+    pub _packet: ChatPacket,
 }
 
 /// We're sending a message to Minecraft from your bridge.
+#[derive(Event)]
 pub struct ToMinecraftEvent<T: Clone + Sync + Send + 'static> {
     pub username: String,
     pub content: String,
     pub context: T,
 }
 
+#[derive(Event)]
 pub struct BridgeInfoEvent<T: Clone + Sync + Send + 'static> {
     pub kind: BridgeInfoKind,
     pub context: T,
@@ -99,9 +93,9 @@ pub fn from_minecraft(
     mut recent_from_minecraft: ResMut<RecentFromMinecraft>,
     mut events: EventReader<azalea::chat::ChatReceivedEvent>,
     mut from_minecraft_events: EventWriter<FromMinecraftEvent>,
-    query: Query<&GameProfileComponent, With<Local>>,
+    query: Query<&GameProfileComponent, With<LocalEntity>>,
 ) {
-    for event in events.iter() {
+    for event in events.read() {
         println!(
             "Got Minecraft chat packet: {}",
             event.packet.message().to_ansi()
@@ -112,7 +106,7 @@ pub fn from_minecraft(
         }
 
         let game_profile = query.single();
-        if event.packet.username() == Some(game_profile.name.clone()) {
+        if event.packet.sender() == Some(game_profile.name.clone()) {
             // we sent this message lol
             continue;
         }
@@ -136,7 +130,7 @@ pub fn from_minecraft(
                 if new_sent_count.is_power_of_two() {
                     from_minecraft_events.send(FromMinecraftEvent {
                         content: format_for_repeats(&message_string, new_sent_count),
-                        packet: event.packet.clone(),
+                        _packet: event.packet.clone(),
                     });
                 }
                 continue;
@@ -150,27 +144,26 @@ pub fn from_minecraft(
         });
         from_minecraft_events.send(FromMinecraftEvent {
             content: message_string,
-            packet: event.packet.clone(),
+            _packet: event.packet.clone(),
         });
     }
 }
 
 pub fn to_minecraft<T: Clone + Sync + Send + 'static>(
-    query: Query<Entity, With<Local>>,
+    query: Query<Entity, With<LocalEntity>>,
     mut events: EventReader<ToMinecraftEvent<T>>,
     mut send_chat_events: EventWriter<azalea_avoid_chat_kick::SendChatEvent>,
     mut bridge_error_events: EventWriter<BridgeInfoEvent<T>>,
 ) {
-    for event in events.iter() {
-        let Ok(entity) =
-            query.get_single() else {
-                // the bot isn't on the server
-                bridge_error_events.send(BridgeInfoEvent {
-                    context: event.context.clone(),
-					kind: BridgeInfoKind::NotInServer,
-                });
-                return;
-            };
+    for event in events.read() {
+        let Ok(entity) = query.get_single() else {
+            // the bot isn't on the server
+            bridge_error_events.send(BridgeInfoEvent {
+                context: event.context.clone(),
+                kind: BridgeInfoKind::NotInServer,
+            });
+            return;
+        };
 
         // check if a message is legal and add it to the queue!
         let message_content = if event.content == "/tps" {
@@ -234,7 +227,7 @@ pub fn pop_no_longer_recent_messages(
         if front_message.sent_count > 2 && !front_message.sent_count.is_power_of_two() {
             from_minecraft_events.send(FromMinecraftEvent {
                 content: format_for_repeats(&front_message.content, front_message.sent_count),
-                packet: front_message.packet,
+                _packet: front_message.packet,
             });
         }
     }

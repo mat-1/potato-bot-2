@@ -1,8 +1,7 @@
-#![feature(async_closure)]
 #![feature(trivial_bounds)]
 
 use azalea::entity::Position;
-use azalea::pathfinder::BlockPosGoal;
+use azalea::pathfinder::goals::BlockPosGoal;
 use azalea::{Account, BlockPos, GameProfileComponent};
 
 mod azalea_avoid_chat_kick;
@@ -19,10 +18,11 @@ use azalea::ecs::prelude::*;
 use azalea::entity::metadata::Player;
 use azalea::prelude::*;
 use azalea::swarm::prelude::*;
+use azalea_viaversion::ViaVersionPlugin;
 use parking_lot::Mutex;
-use std::env;
 use std::sync::Arc;
 use std::time::Duration;
+use std::{env, thread};
 use tokio::time::sleep;
 use twilight_gateway::Intents;
 
@@ -34,29 +34,7 @@ use crate::bevy_discord::DiscordPlugin;
 async fn main() -> anyhow::Result<()> {
     let _ = dotenv::dotenv();
 
-    {
-        use parking_lot::deadlock;
-        use std::thread;
-        use std::time::Duration;
-
-        // Create a background thread which checks for deadlocks every 10s
-        thread::spawn(move || loop {
-            thread::sleep(Duration::from_secs(10));
-            let deadlocks = deadlock::check_deadlock();
-            if deadlocks.is_empty() {
-                continue;
-            }
-
-            println!("{} deadlocks detected", deadlocks.len());
-            for (i, threads) in deadlocks.iter().enumerate() {
-                println!("Deadlock #{i}");
-                for t in threads {
-                    println!("Thread Id {:#?}", t.thread_id());
-                    println!("{:#?}", t.backtrace());
-                }
-            }
-        });
-    }
+    thread::spawn(deadlock_detection_thread);
 
     let account = if let Ok(email) = env::var("EMAIL") {
         Account::microsoft(&email).await?
@@ -113,7 +91,7 @@ async fn main() -> anyhow::Result<()> {
             let position = source.bot.entity_component::<Position>(entity);
             source
                 .bot
-                .goto(BlockPosGoal::from(BlockPos::from(position)));
+                .start_goto(BlockPosGoal(BlockPos::from(position)));
             1
         }),
     );
@@ -121,15 +99,15 @@ async fn main() -> anyhow::Result<()> {
     let commands = Arc::new(commands);
 
     loop {
-        let mut builder = SwarmBuilder::new().add_plugin(AvoidKickPlugin);
+        let mut builder = SwarmBuilder::new().add_plugins(AvoidKickPlugin);
         if let Ok(token) = token.clone() {
             let channel_id = channel_id.expect("Expected DISCORD_CHANNEL_ID in env");
-            builder = builder
-                .add_plugin(DiscordPlugin {
-                    token: token.clone(),
-                    intents: Intents::GUILD_MESSAGES | Intents::MESSAGE_CONTENT,
-                })
-                .add_plugin(DiscordBridgePlugin { channel_id });
+            builder = builder.add_plugins((
+                DiscordPlugin::start(&token, Intents::GUILD_MESSAGES | Intents::MESSAGE_CONTENT)
+                    .await,
+                DiscordBridgePlugin { channel_id },
+                ViaVersionPlugin::start("1.19.4").await,
+            ));
         };
         let error = builder
             .set_handler(handle)
@@ -160,17 +138,17 @@ impl CommandSource {
     pub fn reply(&self, message: &str) {
         if self.chat.is_whisper() {
             self.bot
-                .chat(&format!("/w {} {}", self.chat.username().unwrap(), message));
+                .chat(&format!("/w {} {}", self.chat.sender().unwrap(), message));
         } else {
             self.bot.chat(message);
         }
     }
 
     pub fn entity(&mut self) -> Option<Entity> {
-        let username = self.chat.username()?;
+        let username = self.chat.sender()?;
         self.bot
             .entity_by::<With<Player>, (&GameProfileComponent,)>(
-                |profile: &&GameProfileComponent| profile.name == username,
+                |(profile,): &(&GameProfileComponent,)| profile.name == username,
             )
     }
 }
@@ -209,21 +187,36 @@ async fn handle(bot: Client, event: azalea::Event, state: State) -> anyhow::Resu
 
     Ok(())
 }
-async fn swarm_handle(
-    mut swarm: Swarm,
-    event: SwarmEvent,
-    state: SwarmState,
-) -> anyhow::Result<()> {
+async fn swarm_handle(swarm: Swarm, event: SwarmEvent, _state: SwarmState) -> anyhow::Result<()> {
     match &event {
-        SwarmEvent::Disconnect(account) => {
+        SwarmEvent::Disconnect(account, join_opts) => {
             println!("bot got kicked! {}", account.username);
             tokio::time::sleep(Duration::from_secs(5)).await;
             swarm
-                .add_with_exponential_backoff(account, State::default())
+                .add_and_retry_forever_with_opts(account, State::default(), join_opts)
                 .await;
         }
         _ => {}
     }
 
     Ok(())
+}
+
+fn deadlock_detection_thread() {
+    loop {
+        thread::sleep(Duration::from_secs(10));
+        let deadlocks = parking_lot::deadlock::check_deadlock();
+        if deadlocks.is_empty() {
+            continue;
+        }
+
+        println!("{} deadlocks detected", deadlocks.len());
+        for (i, threads) in deadlocks.iter().enumerate() {
+            println!("Deadlock #{i}");
+            for t in threads {
+                println!("Thread Id {:#?}", t.thread_id());
+                println!("{:#?}", t.backtrace());
+            }
+        }
+    }
 }

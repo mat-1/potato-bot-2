@@ -1,14 +1,8 @@
 use std::collections::VecDeque;
 
-use azalea::{
-    app::{App, CoreSchedule, IntoSystemAppConfig, Plugin},
-    ecs::{
-        event::{EventReader, EventWriter},
-        schedule::IntoSystemConfig,
-        system::{Res, ResMut},
-    },
-    prelude::*,
-};
+use azalea::app::prelude::*;
+use azalea::ecs::prelude::*;
+use azalea::prelude::*;
 
 use crate::{
     azalea_bridge::{
@@ -29,20 +23,23 @@ impl Plugin for DiscordBridgePlugin {
             discord_queue: VecDeque::new(),
             discord_ratelimit: 0,
         })
-        .add_plugin(BridgePlugin::<DiscordContext>::default())
-        .add_systems((
-            minecraft_to_discord_queue
-                .after(from_minecraft)
-                .after(pop_no_longer_recent_messages)
-                .after(discord_to_minecraft),
-            discord_to_minecraft
-                .after(handle_from_discord_events)
-                .after(to_minecraft::<DiscordContext>),
-            handle_bridge_info_events
-                .before(handle_create_reaction)
-                .before(to_minecraft::<DiscordContext>),
-            flush_to_discord_queue.in_schedule(CoreSchedule::FixedUpdate),
-        ));
+        .add_plugins(BridgePlugin::<DiscordContext>::default())
+        .add_systems(
+            Update,
+            (
+                discord_to_minecraft
+                    .after(handle_from_discord_events)
+                    .after(to_minecraft::<DiscordContext>),
+                minecraft_to_discord_queue
+                    .after(from_minecraft)
+                    .after(pop_no_longer_recent_messages)
+                    .after(discord_to_minecraft),
+                handle_bridge_info_events
+                    .before(handle_create_reaction)
+                    .before(to_minecraft::<DiscordContext>),
+            ),
+        )
+        .add_systems(GameTick, flush_to_discord_queue);
     }
 }
 
@@ -64,7 +61,7 @@ fn minecraft_to_discord_queue(
     mut discord_bridge: ResMut<DiscordBridge>,
     mut events: EventReader<FromMinecraftEvent>,
 ) {
-    for event in events.iter() {
+    for event in events.read() {
         let content = event
             .content
             .to_string()
@@ -109,22 +106,25 @@ fn discord_to_minecraft(
     mut events: EventReader<bevy_discord::recv::MessageCreate>,
     mut to_minecraft_events: EventWriter<ToMinecraftEvent<DiscordContext>>,
 ) {
-    for event in events.iter() {
-        if event.author.bot && event.author.discriminator != 0 {
+    for event in events.read() {
+        if event.0.author.bot && event.0.author.discriminator != 0 {
             return;
         }
-        if event.channel_id.get() != discord_bridge.channel_id {
+        if event.0.channel_id.get() != discord_bridge.channel_id {
             return;
         }
 
-        let display_name = if event.author.discriminator == 0 {
-            event.author.name.clone()
+        let display_name = if event.0.author.discriminator == 0 {
+            event.0.author.name.clone()
         } else {
-            format!("{}#{:0>4}", event.author.name, event.author.discriminator)
+            format!(
+                "{}#{:0>4}",
+                event.0.author.name, event.0.author.discriminator
+            )
         };
 
-        let mut content = event.content.clone();
-        for attachment in event.attachments.iter() {
+        let mut content = event.0.content.clone();
+        for attachment in event.0.attachments.iter() {
             if !content.is_empty() {
                 content.push(' ');
             }
@@ -135,8 +135,8 @@ fn discord_to_minecraft(
             content,
             username: display_name,
             context: DiscordContext {
-                channel_id: event.channel_id.get(),
-                message_id: event.id.get(),
+                channel_id: event.0.channel_id.get(),
+                message_id: event.0.id.get(),
             },
         });
     }
@@ -146,7 +146,7 @@ fn handle_bridge_info_events(
     mut events: EventReader<BridgeInfoEvent<DiscordContext>>,
     mut react_events: EventWriter<bevy_discord::send::CreateReaction>,
 ) {
-    for event in events.iter() {
+    for event in events.read() {
         match event.kind {
             BridgeInfoKind::Ack => {
                 react_events.send(bevy_discord::send::CreateReaction {
